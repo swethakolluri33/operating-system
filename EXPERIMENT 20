@@ -1,0 +1,64 @@
+#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+
+sem_t mutex, writeBlock;
+int data = 0, readersCount = 0;
+
+void *reader(void *arg) {
+    int readerId = *(int *)arg;
+    while (1) {
+        sem_wait(&mutex);
+        readersCount++;
+        if (readersCount == 1) {
+            sem_wait(&writeBlock);
+        }
+        sem_post(&mutex);
+        printf("Reader %d read data: %d\n", readerId, data);
+        sem_wait(&mutex);
+        readersCount--;
+        if (readersCount == 0) {
+            sem_post(&writeBlock);
+        }
+        sem_post(&mutex);
+    }
+}
+
+void *writer(void *arg) {
+    int writerId = *(int *)arg;
+    while (1) {
+        sem_wait(&writeBlock);
+        data++;
+        printf("Writer %d wrote data: %d\n", writerId, data);
+        sem_post(&writeBlock);
+    }
+}
+
+int main() {
+    int i;
+    pthread_t readers[5], writers[2];
+    sem_init(&mutex, 0, 1);
+    sem_init(&writeBlock, 0, 1);
+    
+    int readerIds[5] = {1, 2, 3, 4, 5};
+    int writerIds[2] = {1, 2};
+    
+    for (i = 0; i < 5; i++) {
+        pthread_create(&readers[i], NULL, reader, &readerIds[i]);
+    }
+    for (i = 0; i < 2; i++) {
+        pthread_create(&writers[i], NULL, writer, &writerIds[i]);
+    }
+    
+    for (i = 0; i < 5; i++) {
+        pthread_join(readers[i], NULL);
+    }
+    for (i = 0; i < 2; i++) {
+        pthread_join(writers[i], NULL);
+    }
+    
+    sem_destroy(&mutex);
+    sem_destroy(&writeBlock);
+    
+    return 0;
+}
